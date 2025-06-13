@@ -1,0 +1,9 @@
+{
+  "name": "AirControlBase",
+  "content_in_root": false,
+  "filename": "aircontrolbase",
+  "country": ["US", "CA", "GB", "AU", "DE", "FR", "IT", "ES", "NL", "BE", "SE", "NO", "DK", "FI"],
+  "domains": ["climate"],
+  "iot_class": "Cloud Polling",
+  "homeassistant": "2023.1.0"
+}

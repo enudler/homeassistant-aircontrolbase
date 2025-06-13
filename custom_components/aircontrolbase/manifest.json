@@ -1,9 +1,9 @@
 {
   "domain": "aircontrolbase",
   "name": "AirControlBase",
-  "documentation": "https://github.com/yourusername/aircontrolbase",
+  "documentation": "https://github.com/enudler/homeassistant-aircontrolbase",
   "dependencies": [],
-  "codeowners": ["@yourusername"],
+  "codeowners": ["@enudler"],
   "requirements": ["aiohttp"],
   "version": "1.0.0",
   "config_flow": true,

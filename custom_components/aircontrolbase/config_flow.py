@@ -34,15 +34,27 @@ class AirControlBaseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     user_input[CONF_PASSWORD],
                     session,
                 )
-                await api.login()
                 
-                return self.async_create_entry(
-                    title=user_input[CONF_EMAIL],
-                    data=user_input,
-                )
+                _LOGGER.debug("Testing authentication for: %s", user_input[CONF_EMAIL])
+                
+                # Test the connection
+                if await api.test_connection():
+                    _LOGGER.info("Authentication successful for: %s", user_input[CONF_EMAIL])
+                    return self.async_create_entry(
+                        title=user_input[CONF_EMAIL],
+                        data=user_input,
+                    )
+                else:
+                    errors["base"] = "invalid_auth"
+                    
             except Exception as err:
-                _LOGGER.exception("Unexpected exception: %s", err)
-                errors["base"] = "invalid_auth"
+                _LOGGER.error("Authentication failed: %s", err)
+                if "HTTP error" in str(err) or "cannot connect" in str(err).lower():
+                    errors["base"] = "cannot_connect"
+                elif "timeout" in str(err).lower():
+                    errors["base"] = "timeout_connect"
+                else:
+                    errors["base"] = "invalid_auth"
 
         return self.async_show_form(
             step_id="user",

@@ -1,0 +1,11 @@
+{
+  "domain": "aircontrolbase",
+  "name": "AirControlBase",
+  "documentation": "https://github.com/yourusername/aircontrolbase",
+  "dependencies": [],
+  "codeowners": ["@yourusername"],
+  "requirements": ["aiohttp"],
+  "version": "1.0.0",
+  "config_flow": true,
+  "iot_class": "cloud_polling"
+} 

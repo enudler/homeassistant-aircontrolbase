@@ -2,7 +2,6 @@
   "domain": "aircontrolbase",
   "name": "AirControlBase",
   "documentation": "https://github.com/enudler/homeassistant-aircontrolbase",
-  "issue_tracker": "https://github.com/enudler/homeassistant-aircontrolbase/issues",
   "dependencies": [],
   "codeowners": ["@enudler"],
   "requirements": ["aiohttp"],

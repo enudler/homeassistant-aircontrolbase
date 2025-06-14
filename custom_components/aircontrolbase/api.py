@@ -4,6 +4,7 @@ import aiohttp
 import async_timeout
 from typing import Any, Dict, List, Optional
 import time
+import json
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,42 +94,68 @@ class AirControlBaseAPI:
         """Control a device."""
         if not self._user_id:
             raise Exception("Not authenticated - please login first")
-            
+
         self._last_update_time = int(time.time() * 1000)
         data = {
             "userId": self._user_id,
             "control": control,
             "operation": operation,
         }
-        
-        _LOGGER.debug("Controlling device with data: %s", data)
-        
+
+        # Filter the control data to include only the required fields
+        allowed_fields = [
+            "power", "mode", "setTemp", "wind", "swing", "lock", "factTemp",
+            "modeLockValue", "coolLockValue", "heatLockValue", "windLockValue", "unlock", "id"
+        ]
+        filtered_control = {key: control[key] for key in allowed_fields if key in control}
+
+        # Convert control and operation to JSON strings for form encoding
+        form_data = {
+            "userId": self._user_id,
+            "control": json.dumps(operation),
+            "operation": json.dumps(operation),
+        }
+
+        _LOGGER.debug("Sending control request with filtered data: %s", form_data)
+
         try:
             async with async_timeout.timeout(10):
-                headers = {}
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                }
                 if self._session_id:
                     headers["Cookie"] = self._session_id
-                
-                # Use form data consistently
+
                 async with self._session.post(
                     f"{self._base_url}/web/device/control",
-                    data=data,  # Use form data
+                    data=form_data,  # Use form-encoded data
                     headers=headers,
                 ) as response:
                     _LOGGER.debug("Control device response status: %s", response.status)
-                    
+
                     if response.status != 200:
                         raise Exception(f"HTTP error {response.status}")
-                    
+
                     result = await response.json()
                     _LOGGER.debug("Control device response: %s", result)
-                    
+
+                    # Generate a cURL command for debugging
+                    curl_command = (
+                        f"curl --location '{self._base_url}/web/device/control' \\"
+                        f"\n--header 'Content-Type: application/x-www-form-urlencoded' \\"
+                        f"\n--header 'Cookie: {headers.get('Cookie', '')}' \\"
+                        f"\n--data-urlencode 'userId={self._user_id}' \\"
+                        f"\n--data-urlencode 'control={json.dumps(control)}' \\"
+                        f"\n--data-urlencode 'operation={json.dumps(operation)}'"
+                    )
+                    _LOGGER.debug("Generated cURL command: %s", curl_command)
+
                     # Check for success
                     if not (result.get("code") == "200" or result.get("code") == 200 or 
                             result.get("msg") == "操作成功"):
                         error_msg = result.get('msg') or result.get('message') or "Unknown error"
                         raise Exception(f"Control failed: {error_msg}")
-                        
+
         except Exception as e:
             _LOGGER.error("Control device failed: %s", e)
             raise Exception(f"Device control failed: {e}")

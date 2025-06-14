@@ -201,9 +201,20 @@ class AirControlBaseClimate(CoordinatorEntity, ClimateEntity):
             HVACMode.FAN_ONLY: "fan",
         }
         
+        operation_data = self._device.copy()  # Start with all device data
+        operation_data.update({"mode": mode_map[hvac_mode]})
+        if hvac_mode == HVACMode.OFF:
+            operation_data["power"] = "n"  # Explicitly turn off the device
+        else:
+            operation_data["power"] = "y"  # Ensure the device is on for other modes
+
+        control_data = {"control": "mode"}  # Specify the change being made
+
+        _LOGGER.debug("Sending control command to server: %s", operation_data)
+
         await self._api.control_device(
-            self._device["id"],
-            {"mode": mode_map[hvac_mode]},
+            control_data,
+            operation_data,
         )
         await self.coordinator.async_request_refresh()
 

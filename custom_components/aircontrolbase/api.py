@@ -38,11 +38,11 @@ class AirControlBaseAPI:
         _LOGGER.debug("Attempting login to AirControlBase with email: %s", self._email)
         
         try:
+            # Use form data (this is what works!)
             async with async_timeout.timeout(10):
                 async with self._session.post(
                     f"{self._base_url}/web/user/login",
-                    json=data,  # Try JSON instead of form data
-                    headers={"Content-Type": "application/json"},
+                    data=data,  # Use form data, not JSON
                 ) as response:
                     _LOGGER.debug("Login response status: %s", response.status)
                     _LOGGER.debug("Login response headers: %s", dict(response.headers))
@@ -59,21 +59,14 @@ class AirControlBaseAPI:
                     
                     _LOGGER.debug("Login response: %s", result)
                     
-                    # Check multiple possible success indicators
-                    if (result.get("code") == 0 or 
-                        result.get("code") == "0" or 
-                        result.get("code") == 200 or 
-                        result.get("code") == "200" or
-                        result.get("success") is True or
-                        result.get("status") == "success"):
+                    # Check for success (code "200" for form data)
+                    if (result.get("code") == "200" or 
+                        result.get("code") == 200 or
+                        result.get("msg") == "操作成功"):  # "Operation successful" in Chinese
                         
-                        # Extract user ID
+                        # Extract user ID from result
                         if "result" in result and "id" in result["result"]:
                             self._user_id = result["result"]["id"]
-                        elif "user_id" in result:
-                            self._user_id = result["user_id"]
-                        elif "userId" in result:
-                            self._user_id = result["userId"]
                         else:
                             _LOGGER.error("No user ID found in response: %s", result)
                             raise Exception("No user ID in response")
@@ -83,40 +76,17 @@ class AirControlBaseAPI:
                         if cookies:
                             self._session_id = '; '.join(cookies)
                         else:
-                            _LOGGER.warning("No session cookies found, trying without")
+                            _LOGGER.warning("No session cookies found")
                             self._session_id = ""
                         
                         _LOGGER.info("Successfully logged in to AirControlBase (User ID: %s)", self._user_id)
                     else:
-                        error_msg = result.get('message') or result.get('error') or f"Unknown error (code: {result.get('code')})"
+                        error_msg = result.get('msg') or result.get('message') or f"Unknown error (code: {result.get('code')})"
                         _LOGGER.error("Login failed: %s", error_msg)
                         raise Exception(f"Login failed: {error_msg}")
                         
         except Exception as e:
             _LOGGER.error("Login exception: %s", e)
-            # Try with form data as fallback
-            try:
-                _LOGGER.debug("Retrying login with form data")
-                async with async_timeout.timeout(10):
-                    async with self._session.post(
-                        f"{self._base_url}/web/user/login",
-                        data=data,  # Form data
-                    ) as response:
-                        if response.status == 200:
-                            result = await response.json()
-                            _LOGGER.debug("Fallback login response: %s", result)
-                            
-                            if (result.get("code") == 0 or result.get("code") == "0" or 
-                                result.get("success") is True):
-                                self._user_id = result.get("result", {}).get("id") or result.get("user_id")
-                                cookies = response.headers.getall('Set-Cookie', [])
-                                self._session_id = '; '.join(cookies) if cookies else ""
-                                _LOGGER.info("Fallback login successful")
-                                return
-                                
-            except Exception as fallback_error:
-                _LOGGER.error("Fallback login also failed: %s", fallback_error)
-            
             raise Exception(f"Authentication failed: {e}")
 
     async def control_device(self, control: Dict[str, Any], operation: Dict[str, Any]) -> None:
@@ -135,13 +105,14 @@ class AirControlBaseAPI:
         
         try:
             async with async_timeout.timeout(10):
-                headers = {"Content-Type": "application/json"}
+                headers = {}
                 if self._session_id:
                     headers["Cookie"] = self._session_id
                 
+                # Use form data consistently
                 async with self._session.post(
                     f"{self._base_url}/web/device/control",
-                    json=data,
+                    data=data,  # Use form data
                     headers=headers,
                 ) as response:
                     _LOGGER.debug("Control device response status: %s", response.status)
@@ -152,29 +123,14 @@ class AirControlBaseAPI:
                     result = await response.json()
                     _LOGGER.debug("Control device response: %s", result)
                     
-                    if not (result.get("code") == 0 or result.get("code") == "0" or 
-                            result.get("success") is True):
-                        error_msg = result.get('message') or result.get('error') or "Unknown error"
+                    # Check for success
+                    if not (result.get("code") == "200" or result.get("code") == 200 or 
+                            result.get("msg") == "操作成功"):
+                        error_msg = result.get('msg') or result.get('message') or "Unknown error"
                         raise Exception(f"Control failed: {error_msg}")
                         
         except Exception as e:
             _LOGGER.error("Control device failed: %s", e)
-            # Try fallback with form data
-            try:
-                async with async_timeout.timeout(10):
-                    headers = {"Cookie": self._session_id} if self._session_id else {}
-                    async with self._session.post(
-                        f"{self._base_url}/web/device/control",
-                        data=data,
-                        headers=headers,
-                    ) as response:
-                        if response.status == 200:
-                            result = await response.json()
-                            if result.get("code") == 0:
-                                return
-            except Exception as fallback_error:
-                _LOGGER.error("Fallback control device also failed: %s", fallback_error)
-            
             raise Exception(f"Device control failed: {e}")
 
     async def get_devices(self) -> List[Dict[str, Any]]:
@@ -197,10 +153,11 @@ class AirControlBaseAPI:
                 if self._session_id:
                     headers["Cookie"] = self._session_id
                 
+                # Use form data consistently
                 async with self._session.post(
                     f"{self._base_url}/web/userGroup/getDetails",
-                    json=data,  # Try JSON first
-                    headers={**headers, "Content-Type": "application/json"},
+                    data=data,  # Use form data
+                    headers=headers,
                 ) as response:
                     _LOGGER.debug("Get devices response status: %s", response.status)
                     
@@ -210,39 +167,20 @@ class AirControlBaseAPI:
                     result = await response.json()
                     _LOGGER.debug("Get devices response: %s", result)
                     
-                    if (result.get("code") == 0 or result.get("code") == "0" or 
-                        result.get("success") is True):
+                    # Check for success (code "200" for this API)
+                    if (result.get("code") == "200" or result.get("code") == 200 or
+                        result.get("msg") == "操作成功"):  # "Operation successful"
                         all_devices = []
                         if result.get("result", {}).get("areas"):
                             for area in result["result"]["areas"]:
                                 all_devices.extend(area.get("data", []))
                         return all_devices
                     else:
-                        error_msg = result.get('message') or result.get('error') or "Unknown error"
+                        error_msg = result.get('msg') or result.get('message') or "Unknown error"
                         raise Exception(f"Failed to get devices: {error_msg}")
                         
         except Exception as e:
             _LOGGER.error("Get devices failed: %s", e)
-            # Try fallback with form data
-            try:
-                async with async_timeout.timeout(10):
-                    headers = {"Cookie": self._session_id} if self._session_id else {}
-                    async with self._session.post(
-                        f"{self._base_url}/web/userGroup/getDetails",
-                        data=data,
-                        headers=headers,
-                    ) as response:
-                        if response.status == 200:
-                            result = await response.json()
-                            if result.get("code") == 0:
-                                all_devices = []
-                                if result.get("result", {}).get("areas"):
-                                    for area in result["result"]["areas"]:
-                                        all_devices.extend(area.get("data", []))
-                                return all_devices
-            except Exception as fallback_error:
-                _LOGGER.error("Fallback get devices also failed: %s", fallback_error)
-            
             raise Exception(f"Failed to get devices: {e}")
 
     async def test_connection(self) -> bool:
@@ -250,7 +188,7 @@ class AirControlBaseAPI:
         try:
             await self.login()
             # Try to get devices to fully test the connection
-            await self.get_devices()
+            devices = await self.get_devices()
             return True
         except Exception as e:
             _LOGGER.error("Connection test failed: %s", e)

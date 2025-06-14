@@ -172,3 +172,5 @@ configuration.yaml
 
 # Test credentials (to avoid accidentally committing test credentials)
 test_credentials.py 
+
+env.var

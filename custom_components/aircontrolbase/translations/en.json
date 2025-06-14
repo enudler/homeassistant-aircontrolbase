@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "title": "Set up AirControlBase",
+        "description": "Enter your AirControlBase account credentials"
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password",
+      "cannot_connect": "Cannot connect to AirControlBase servers",
+      "timeout_connect": "Connection timeout",
+      "unknown": "Unknown error occurred"
+    },
+    "abort": {
+      "already_configured": "Account is already configured"
+    }
+  }
+}

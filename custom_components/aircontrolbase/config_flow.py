@@ -9,6 +9,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import aiohttp_client
 
 from .api import AirControlBaseAPI
 from .const import DOMAIN
@@ -28,7 +29,7 @@ class AirControlBaseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+                session = aiohttp_client.async_get_clientsession(self.hass)
                 api = AirControlBaseAPI(
                     user_input[CONF_EMAIL],
                     user_input[CONF_PASSWORD],
@@ -65,4 +66,4 @@ class AirControlBaseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
-        ) 
+        )

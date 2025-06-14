@@ -99,44 +99,11 @@ __pypackages__/
 celerybeat-schedule
 celerybeat.pid
 
-# SageMath parsed files
-*.sage.py
-
-# Environments
+# Environment variables
 .env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-.idea/
+env.var
+.env.*
+!env.example
 
 # VS Code
 .vscode/
@@ -171,6 +138,4 @@ configuration.yaml
 *.temp
 
 # Test credentials (to avoid accidentally committing test credentials)
-test_credentials.py 
-
-env.var
+test_credentials.py

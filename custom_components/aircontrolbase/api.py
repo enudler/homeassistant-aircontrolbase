@@ -174,14 +174,56 @@ class AirControlBaseAPI:
                         if result.get("result", {}).get("areas"):
                             for area in result["result"]["areas"]:
                                 all_devices.extend(area.get("data", []))
+                        _LOGGER.debug("Parsed devices: %s", all_devices)
                         return all_devices
                     else:
                         error_msg = result.get('msg') or result.get('message') or "Unknown error"
+                        _LOGGER.error("Failed to get devices: %s", error_msg)
                         raise Exception(f"Failed to get devices: {error_msg}")
                         
         except Exception as e:
             _LOGGER.error("Get devices failed: %s", e)
             raise Exception(f"Failed to get devices: {e}")
+
+    async def getDetails(self) -> List[Dict[str, Any]]:
+        """Fetch device details from the API."""
+        if not self._user_id:
+            raise Exception("Not authenticated - please login first")
+
+        data = {"userId": self._user_id}
+
+        try:
+            async with async_timeout.timeout(10):
+                headers = {}
+                if self._session_id:
+                    headers["Cookie"] = self._session_id
+
+                async with self._session.post(
+                    f"{self._base_url}/web/userGroup/getDetails",
+                    data=data,
+                    headers=headers,
+                ) as response:
+                    _LOGGER.debug("GetDetails response status: %s", response.status)
+
+                    if response.status != 200:
+                        raise Exception(f"HTTP error {response.status}")
+
+                    result = await response.json()
+                    _LOGGER.debug("GetDetails response: %s", result)
+
+                    if result.get("code") in ("200", 200) or result.get("msg") == "操作成功":
+                        all_devices = []
+                        if result.get("result", {}).get("areas"):
+                            for area in result["result"]["areas"]:
+                                all_devices.extend(area.get("data", []))
+                        _LOGGER.debug("Parsed devices: %s", all_devices)
+                        return all_devices
+                    else:
+                        error_msg = result.get('msg') or result.get('message') or "Unknown error"
+                        raise Exception(f"API error: {error_msg}")
+        except Exception as err:
+            _LOGGER.error("Error in getDetails: %s", err)
+            raise
 
     async def test_connection(self) -> bool:
         """Test if the connection and authentication are working."""
@@ -192,4 +234,10 @@ class AirControlBaseAPI:
             return True
         except Exception as e:
             _LOGGER.error("Connection test failed: %s", e)
-            return False 
+            return False
+
+    async def ensure_authenticated(self) -> None:
+        """Ensure the API client is authenticated."""
+        if not self._user_id or not self._session_id:
+            _LOGGER.warning("Session expired or not authenticated. Re-authenticating...")
+            await self.login()

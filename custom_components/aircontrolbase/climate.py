@@ -58,11 +58,11 @@ class AirControlBaseClimate(CoordinatorEntity, ClimateEntity):
         self._attr_name = device["name"]
         self._attr_supported_features = (
             ClimateEntityFeature.TARGET_TEMPERATURE |
-            ClimateEntityFeature.FAN_MODE |
-            ClimateEntityFeature.SWING_MODE
+            ClimateEntityFeature.FAN_MODE
         )
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
-        self._attr_precision = PRECISION_WHOLE
+        self._attr_precision = PRECISION_WHOLE  # Ensure temperature changes by 1°C increments
+        self._attr_target_temperature_step = 1  # Enforce 1°C increments for temperature changes
         self._attr_hvac_modes = [
             HVACMode.OFF,
             HVACMode.COOL,
@@ -137,7 +137,8 @@ class AirControlBaseClimate(CoordinatorEntity, ClimateEntity):
     @property
     def fan_mode(self) -> Optional[str]:
         """Return the current fan mode."""
-        return self._device.get("wind")
+        mode = self._device.get("wind")
+        return "medium" if mode == "mid" else mode
 
     @property
     def fan_modes(self) -> List[str]:
@@ -145,14 +146,9 @@ class AirControlBaseClimate(CoordinatorEntity, ClimateEntity):
         return ["auto", "low", "medium", "high"]
 
     @property
-    def swing_mode(self) -> Optional[str]:
-        """Return the swing setting."""
-        return self._device.get("swingMode")
-
-    @property
-    def swing_modes(self) -> List[str]:
-        """Return the list of available swing modes."""
-        return ["off", "vertical", "horizontal", "both"]
+    def icon(self) -> str:
+        """Return the icon for the entity."""
+        return "mdi:air-conditioner"  # Use an air conditioner icon
 
     async def async_update(self):
         """Fetch the latest data from the coordinator."""
@@ -173,18 +169,17 @@ class AirControlBaseClimate(CoordinatorEntity, ClimateEntity):
             "aid": self._device.get("aid"),
         }
 
-        operation_data = {
-            "mode": self.hvac_mode,
-            "power": "y",
-            "setTemp": temperature,
-            "wind": self._device.get("windMode"),
-            "swing": self._device.get("swingMode"),
-            "other": self._device.get("otherSettings"),
-        }
+        operation_data = self._device.copy()  # Start with all device data
+        operation_data["setTemp"] = int(temperature)
 
         try:
             await self._api.control_device(control_data, operation_data)
             _LOGGER.info("Successfully set temperature to %s for device %s", temperature, self._device.get("id"))
+            
+            # Immediately update local state for instant UI response
+            self._device["setTemp"] = int(temperature)
+            self._device["power"] = "y"  # Device is now on
+            self.async_write_ha_state()
 
             # Trigger a state refresh after sending the command
             await self.coordinator.async_request_refresh()
@@ -207,31 +202,54 @@ class AirControlBaseClimate(CoordinatorEntity, ClimateEntity):
             operation_data["power"] = "n"  # Explicitly turn off the device
         else:
             operation_data["power"] = "y"  # Ensure the device is on for other modes
+            # Set fan speed to auto when turning the device on
+            if self._device.get("power") == "n":  # Device was off, now turning on
+                operation_data["wind"] = "auto"
 
         control_data = {"control": "mode"}  # Specify the change being made
 
         _LOGGER.debug("Sending control command to server: %s", operation_data)
 
-        await self._api.control_device(
-            control_data,
-            operation_data,
-        )
-        await self.coordinator.async_request_refresh()
+        try:
+            await self._api.control_device(
+                control_data,
+                operation_data,
+            )
+            
+            # Immediately update local state for instant UI response
+            self._device["mode"] = mode_map[hvac_mode]
+            self._device["power"] = operation_data["power"]
+            if "wind" in operation_data:
+                self._device["wind"] = operation_data["wind"]
+            self.async_write_ha_state()
+            
+            await self.coordinator.async_request_refresh()
+        except Exception as e:
+            _LOGGER.error("Failed to set HVAC mode: %s", e)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set the fan mode."""
-        if fan_mode not in ["low", "mid", "high", "auto"]:
+        if fan_mode not in ["low", "medium", "high", "auto"]:
             _LOGGER.error("Invalid fan mode: %s", fan_mode)
             return
 
-        await self._api.set_device_property(self._device["id"], "wind", fan_mode)
-        self._device["wind"] = fan_mode
-        self.async_write_ha_state()
+        # Map 'medium' back to 'mid' for AirControlBase
+        api_mode = "mid" if fan_mode == "medium" else fan_mode
 
-    async def async_set_swing_mode(self, swing_mode: str) -> None:
-        """Set new target swing mode."""
-        await self._api.control_device(
-            self._device["id"],
-            {"swingMode": swing_mode},
-        )
-        await self.coordinator.async_request_refresh()
+        control_data = {
+            "id": self._device["id"],
+        }
+        operation_data = self._device.copy()
+        operation_data["wind"] = api_mode
+
+        try:
+            await self._api.control_device(control_data, operation_data)
+            
+            # Immediately update local state for instant UI response
+            self._device["wind"] = api_mode
+            self.async_write_ha_state()
+            
+            # Trigger coordinator refresh to get actual device state
+            await self.coordinator.async_request_refresh()
+        except Exception as e:
+            _LOGGER.error("Failed to set fan mode: %s", e)

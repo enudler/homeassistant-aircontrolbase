@@ -145,7 +145,7 @@ class AirControlBaseAPI:
                         f"\n--header 'Content-Type: application/x-www-form-urlencoded' \\"
                         f"\n--header 'Cookie: {headers.get('Cookie', '')}' \\"
                         f"\n--data-urlencode 'userId={self._user_id}' \\"
-                        f"\n--data-urlencode 'control={json.dumps(control)}' \\"
+                        f"\n--data-urlencode 'control={json.dumps(operation)}' \\"
                         f"\n--data-urlencode 'operation={json.dumps(operation)}'"
                     )
                     _LOGGER.debug("Generated cURL command: %s", curl_command)
